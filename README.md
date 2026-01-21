@@ -24,9 +24,6 @@ The focus of this project is creating dependable concurrency mechanisms and job 
   - retries performed
   - timeouts recorded
   - average runtime
-- Graceful shutdown with no deadlocks or hanging threads
+- Shutdown with no deadlocks or hanging threads
 
----
-
-## Project Structure
 
