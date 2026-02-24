@@ -2,11 +2,21 @@
 
 namespace task_engine {
 
+static std::deque<Job>& bucket_for(Job& job, std::deque<Job>& high, std::deque<Job>& normal, std::deque<Job>& low) {
+  if (job.priority() == Priority::High) return high;
+  if (job.priority() == Priority::Low) return low;
+  
+  return normal;
+}
+
 bool JobQueue::push(const Job& job) {
   {
     std::lock_guard<std::mutex> lock(mtx_);
     if (closed_) return false;
-    q_.push_back(job);
+
+    if (job.priority() == Priority::High) high_.push_back(job);
+    else if (job.priority() == Priority::Low) low_.push_back(job);
+    else normal_.push_back(job);
   }
   cv_.notify_one();
   return true;
@@ -16,7 +26,11 @@ bool JobQueue::push(Job&& job) {
   {
     std::lock_guard<std::mutex> lock(mtx_);
     if (closed_) return false;
-    q_.push_back(std::move(job));
+
+    const auto pri = job.priority();
+    if (pri == Priority::High) high_.push_back(std::move(job));
+    else if (pri == Priority::Low) low_.push_back(std::move(job));
+    else normal_.push_back(std::move(job));
   }
   cv_.notify_one();
   return true;
@@ -25,16 +39,27 @@ bool JobQueue::push(Job&& job) {
 bool JobQueue::pop(Job& out) {
   std::unique_lock<std::mutex> lock(mtx_);
 
-  // Wait until we have data or the queue is closed
-  cv_.wait(lock, [&] { return closed_ || !q_.empty(); });
+  cv_.wait(lock, [&] {
+    return closed_ || !high_.empty() || !normal_.empty() || !low_.empty();
+  });
 
-  // If closed and empty, we are done
-  if (q_.empty()) {
+  if (high_.empty() && normal_.empty() && low_.empty()) {
     return false;
   }
 
-  out = std::move(q_.front());
-  q_.pop_front();
+  if (!high_.empty()) {
+    out = std::move(high_.front());
+    high_.pop_front();
+    return true;
+  }
+  if (!normal_.empty()) {
+    out = std::move(normal_.front());
+    normal_.pop_front();
+    return true;
+  }
+
+  out = std::move(low_.front());
+  low_.pop_front();
   return true;
 }
 
@@ -53,7 +78,7 @@ bool JobQueue::is_closed() const {
 
 std::size_t JobQueue::size() const {
   std::lock_guard<std::mutex> lock(mtx_);
-  return q_.size();
+  return high_.size() + normal_.size() + low_.size();
 }
 
 } // namespace task_engine
