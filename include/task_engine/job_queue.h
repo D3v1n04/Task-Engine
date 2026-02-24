@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "task_engine/job.h"
+#include "task_engine/types.h"
 
 namespace task_engine {
 
@@ -15,20 +16,11 @@ public:
   JobQueue(const JobQueue&) = delete;
   JobQueue& operator=(const JobQueue&) = delete;
 
-  // Push a job into the queue
-  // Returns false if queue is closed (job not accepted)
   bool push(const Job& job);
   bool push(Job&& job);
 
-  // Blocking pop:
-  // 1) blocks while queue is empty and not closed
-  // 2) returns true if a job was popped into out
-  // 3) returns false if queue is closed and empty (no more jobs will arrive)
   bool pop(Job& out);
 
-  // Close queue:
-  // 1) stops further pushes
-  // 2) wakes all waiting pop() calls
   void close();
 
   bool is_closed() const;
@@ -37,7 +29,12 @@ public:
 private:
   mutable std::mutex mtx_;
   std::condition_variable cv_;
-  std::deque<Job> q_;
+
+  // FIFO within each priority bucket
+  std::deque<Job> high_;
+  std::deque<Job> normal_;
+  std::deque<Job> low_;
+
   bool closed_{false};
 };
 
