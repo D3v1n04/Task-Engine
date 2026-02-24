@@ -3,13 +3,8 @@
 
 namespace task_engine {
 
-Job::Job(JobId id, std::string name, Fn fn, RetryPolicy retry, TimeoutPolicy timeout)
-    : id_(id),
-      name_(std::move(name)),
-      fn_(std::move(fn)),
-      retry_(retry),
-      timeout_(timeout),
-      created_at_(std::chrono::steady_clock::now()) {}
+Job::Job(JobId id, std::string name, Fn fn, RetryPolicy retry, TimeoutPolicy timeout, Priority priority)
+    : id_(id), name_(std::move(name)), fn_(std::move(fn)), retry_(retry), timeout_(timeout), priority_(priority), created_at_(std::chrono::steady_clock::now()) {}
 
 JobResult Job::run_once() {
   state_ = JobState::Running;
