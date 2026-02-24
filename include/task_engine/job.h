@@ -17,27 +17,31 @@ enum class BackoffType {
 
 struct RetryPolicy {
   int max_retries = 0; // retries after the first attempt
-
   BackoffType backoff = BackoffType::None;
 
-  // For Fixed and Exponential backoff
-  // If 0ms, it behaves like None.
+  // Fixed and Exponential backoff
   std::chrono::milliseconds base_delay{0};
 };
 
-
 struct TimeoutPolicy {
-  std::chrono::milliseconds timeout{0}; // 0 = no timeout (MVP)
+  std::chrono::milliseconds timeout{0}; // 0 = no timeout
 };
 
 class Job {
 public:
-  using Fn = std::function<JobResult()>; // returning JobResult makes retries easy
+  using Fn = std::function<JobResult()>; // returns JobResult
 
-  Job(JobId id, std::string name, Fn fn, RetryPolicy retry = {}, TimeoutPolicy timeout = {});
+  Job(JobId id,
+      std::string name,
+      Fn fn,
+      RetryPolicy retry = {},
+      TimeoutPolicy timeout = {},
+      Priority priority = Priority::Normal);
 
   JobId id() const { return id_; }
   const std::string& name() const { return name_; }
+
+  Priority priority() const { return priority_; }
 
   JobState state() const { return state_; }
   int attempts() const { return attempts_; }
@@ -45,7 +49,6 @@ public:
   int max_retries() const { return retry_.max_retries; }
   std::chrono::milliseconds timeout() const { return timeout_.timeout; }
 
-  // Executes one attempt (scheduler will call this later)
   JobResult run_once();
 
 private:
@@ -55,6 +58,8 @@ private:
 
   RetryPolicy retry_;
   TimeoutPolicy timeout_;
+
+  Priority priority_{Priority::Normal};
 
   JobState state_{JobState::Pending};
   int attempts_{0};
